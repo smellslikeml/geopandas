@@ -1441,6 +1441,7 @@ properties': {'col1': 'name1'}, 'geometry': {'type': 'Point', 'coordinates': (1.
         geometry_encoding: PARQUET_GEOMETRY_ENCODINGS = "WKB",
         write_covering_bbox: bool = False,
         schema_version: SUPPORTED_VERSIONS_LITERAL | None = None,
+        partition_cols: str | list[str] | None = None,
         **kwargs,
     ) -> None:
         """Write a GeoDataFrame to the Parquet format.
@@ -1479,6 +1480,13 @@ default 'snappy'
         schema_version : {'0.1.0', '0.4.0', '1.0.0', '1.1.0', '2.0.0', None}
             GeoParquet specification version; if not provided, will default to
             latest supported stable version (1.1.0).
+        partition_cols : str or list of str, default None
+            Column names by which to partition the dataset. Columns are
+            partitioned in the order they are given. If provided, the data
+            is written as a Hive-partitioned dataset using
+            :func:`pyarrow.parquet.write_to_dataset`, and the partition
+            columns are removed from the file contents and encoded in the
+            directory names. Requires a directory path, not a file handle.
         kwargs
             Additional keyword arguments passed to :func:`pyarrow.parquet.write_table`.
 
@@ -1511,6 +1519,7 @@ default 'snappy'
             index=index,
             schema_version=schema_version,
             write_covering_bbox=write_covering_bbox,
+            partition_cols=partition_cols,
             **kwargs,
         )
 

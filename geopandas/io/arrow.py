@@ -467,6 +467,7 @@ def _to_parquet(
     geometry_encoding="WKB",
     schema_version=None,
     write_covering_bbox=False,
+    partition_cols=None,
     **kwargs,
 ):
     """
@@ -506,6 +507,13 @@ def _to_parquet(
         Writes the bounding box column for each row entry with column
         name 'bbox'. Writing a bbox column can be computationally
         expensive, hence is default setting is False.
+    partition_cols : str or list of str, default None
+        Column names by which to partition the dataset. Columns are
+        partitioned in the order they are given. If provided, the data is
+        written as a Hive-partitioned dataset using
+        :func:`pyarrow.parquet.write_to_dataset`, and the partition columns
+        are removed from the file contents and encoded in the directory
+        names. Requires a directory path, not a file handle.
     **kwargs
         Additional keyword arguments passed to pyarrow.parquet.write_table().
     """
@@ -521,7 +529,20 @@ def _to_parquet(
         schema_version=schema_version,
         write_covering_bbox=write_covering_bbox,
     )
-    parquet.write_table(table, path, compression=compression, **kwargs)
+    if isinstance(partition_cols, str):
+        partition_cols = [partition_cols]
+    if partition_cols is not None:
+        # mirror pandas' behaviour of writing a Hive-partitioned dataset
+        # (https://github.com/geopandas/geopandas/issues/2361)
+        parquet.write_to_dataset(
+            table,
+            path,
+            compression=compression,
+            partition_cols=partition_cols,
+            **kwargs,
+        )
+    else:
+        parquet.write_table(table, path, compression=compression, **kwargs)
 
 
 def _to_feather(df, path, index=None, compression=None, schema_version=None, **kwargs):

@@ -363,6 +363,7 @@ def test_to_parquet_does_not_pass_engine_along(mock_to_parquet):
         compression="snappy",
         geometry_encoding="WKB",
         index=None,
+        partition_cols=None,
         schema_version=None,
         write_covering_bbox=False,
     )
@@ -1053,8 +1054,9 @@ def test_read_gdal_files():
 
 
 def test_parquet_read_partitioned_dataset(tmpdir, naturalearth_lowres):
-    # we don't yet explicitly support this (in writing), but for Parquet it
-    # works for reading (by relying on pyarrow.read_table)
+    # datasets partitioned this way can also be written directly using
+    # `to_parquet(partition_cols=...)`; here the dataset is created manually
+    # and read relying on the pyarrow dataset API
     df = read_file(naturalearth_lowres)
 
     # manually create partitioned dataset
@@ -1104,6 +1106,50 @@ def test_parquet_read_partitioned_dataset_partitioning_none(
     result = read_parquet(basedir, partitioning=None)
     assert "key" not in result.columns
     assert len(result) == len(df)
+
+
+def test_to_parquet_partition_cols(tmpdir, naturalearth_lowres):
+    df = read_file(naturalearth_lowres)
+
+    basedir = tmpdir / "partitioned_dataset"
+    df.to_parquet(basedir, partition_cols=["continent"])
+    # written as a Hive-partitioned dataset: one directory per unique value
+    # of the partition column
+    subdirs = [f for f in os.listdir(basedir) if f.startswith("continent=")]
+    assert len(subdirs) == df["continent"].nunique()
+
+    # the partition column is read back from the directory names as a
+    # categorical column appended at the end, and the row order is not
+    # preserved
+    result = read_parquet(basedir)
+    assert isinstance(result["continent"].dtype, pd.CategoricalDtype)
+    expected = df.copy()
+    expected["continent"] = expected["continent"].astype("category")
+    result = result.sort_values(["iso_a3", "name"]).reset_index(drop=True)
+    expected = expected.sort_values(["iso_a3", "name"]).reset_index(drop=True)
+    assert_geodataframe_equal(result, expected[result.columns])
+
+
+def test_to_parquet_partition_cols_fsspec(naturalearth_lowres):
+    fsspec = pytest.importorskip("fsspec")
+
+    df = read_file(naturalearth_lowres)
+
+    # the filesystem needs to be passed explicitly for fsspec-based
+    # filesystems pyarrow does not know about
+    memfs = fsspec.filesystem("memory")
+    df.to_parquet(
+        "memory://to_parquet_partitioned",
+        partition_cols=["continent"],
+        filesystem=memfs,
+    )
+    result = read_parquet("memory://to_parquet_partitioned")
+
+    expected = df.copy()
+    expected["continent"] = expected["continent"].astype("category")
+    result = result.sort_values(["iso_a3", "name"]).reset_index(drop=True)
+    expected = expected.sort_values(["iso_a3", "name"]).reset_index(drop=True)
+    assert_geodataframe_equal(result, expected[result.columns])
 
 
 @pytest.fixture
