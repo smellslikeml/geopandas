@@ -319,3 +319,26 @@ the spatial information.
     version is used when writing files, but older versions can be specified using
     the ``schema_version`` keyword. GeoPandas supports reading files
     encoded using any GeoParquet version.
+
+Writing partitioned datasets
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The ``partition_cols`` keyword of :meth:`geopandas.GeoDataFrame.to_parquet`
+allows writing the data as a Hive-partitioned dataset, mirroring the behaviour
+of :meth:`pandas.DataFrame.to_parquet`. The dataset is then written as a set
+of subdirectories and Parquet files, with the values of the partition columns
+encoded in the directory names::
+
+    countries_gdf.to_parquet("countries_dataset", partition_cols=["continent"])
+
+resulting in a directory structure like::
+
+    countries_dataset/
+      continent=Africa/<uuid>.parquet
+      continent=Asia/<uuid>.parquet
+      ...
+      continent=South%20America/<uuid>.parquet
+
+Such a dataset can be read back with :func:`geopandas.read_parquet`, which
+infers the partition column from the directory names (the partition column
+comes back with a categorical dtype).

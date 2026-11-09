@@ -1,5 +1,12 @@
 # Changelog
 
+## Development version
+
+New features and improvements:
+
+- Added `partition_cols` keyword to `GeoDataFrame.to_parquet` to write
+  Hive-partitioned datasets, mirroring `pandas.DataFrame.to_parquet` (#2361).
+
 ## Version 1.2.0 (September 28, 2026)
 
 New features and improvements:
